@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Geist+Mono:wght@300;400;500&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --bg:       #f7f5f0;
+  --surface:  #ffffff;
+  --line:     #e8e4dc;
+  --line2:    #d4cfc5;
+  --text:     #1a1814;
+  --mid:      #7a756c;
+  --faint:    #b0aa9e;
+  --accent:   #b84c2a;   /* single warm terracotta — only used for meaning */
+  --ok:       #2a6644;
+  --ok-bg:    #edf5f0;
+  --warn-bg:  #fdf3ee;
+}
+
+html { font-size: 15px; }
+body {
+  font-family: 'Geist Mono', monospace;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 32px 24px 64px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* ── TYPOGRAPHY ── */
+.serif { font-family: 'EB Garamond', Georgia, serif; }
+h1 { font-family:'EB Garamond',serif; font-size:1.6rem; font-weight:400; letter-spacing:-.01em; }
+.label {
+  font-size:.62rem; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--faint); font-weight:400;
+}
+.mono { font-family:'Geist Mono',monospace; }
+
+/* ── LAYOUT ── */
+.divider { border:none; border-top:1px solid var(--line); margin:24px 0; }
+.row { display:flex; align-items:center; gap:12px; }
+.row-between { display:flex; align-items:center; justify-content:space-between; }
+.col { display:flex; flex-direction:column; }
+
+/* ── TABS ── */
+.tabs { display:flex; gap:0; margin-bottom:28px; border-bottom:1px solid var(--line); }
+.tab {
+  font-family:'Geist Mono',monospace;
+  font-size:.68rem; letter-spacing:.08em; text-transform:uppercase;
+  background:none; border:none; cursor:pointer;
+  padding:10px 18px 10px 0; color:var(--faint);
+  border-bottom:2px solid transparent; margin-bottom:-1px;
+  transition:color .15s, border-color .15s;
+}
+.tab.active { color:var(--text); border-bottom-color:var(--text); }
+.tab:hover:not(.active) { color:var(--mid); }
+
+/* ── GOAL BANNER ── */
+.goal-bar {
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:4px;
+  padding:16px 18px;
+  margin-bottom:20px;
+}
+.goal-bar.empty { border-style:dashed; cursor:pointer; }
+.goal-bar.empty:hover { border-color:var(--line2); }
+.goal-progress-track {
+  height:3px; background:var(--line); border-radius:2px; margin-top:10px; overflow:hidden;
+}
+.goal-progress-fill {
+  height:100%; background:var(--ok); border-radius:2px;
+  transition:width .6s cubic-bezier(.25,1,.5,1);
+}
+.goal-edit {
+  font-family:'Geist Mono',monospace; font-size:.72rem;
+  background:none; border:none; color:var(--accent); cursor:pointer;
+  padding:0; text-decoration:underline; text-underline-offset:2px;
+}
+
+/* ── SUMMARY STRIP ── */
+.summary {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:1px; background:var(--line);
+  border:1px solid var(--line); border-radius:4px;
+  overflow:hidden; margin-bottom:20px;
+}
+.stat { background:var(--surface); padding:14px 16px; }
+.stat-val {
+  font-family:'EB Garamond',serif;
+  font-size:1.5rem; line-height:1.1;
+  font-weight:400; letter-spacing:-.01em;
+  color:var(--text);
+}
+.stat-val.ok  { color:var(--ok); }
+.stat-val.warn{ color:var(--accent); }
+
+/* ── BURN RATE STRIP ── */
+.burn {
+  background:var(--warn-bg);
+  border:1px solid #e8c9ba;
+  border-radius:4px;
+  padding:11px 16px;
+  font-size:.7rem;
+  color:var(--accent);
+  margin-bottom:16px;
+  display:none;
+}
+.burn.show { display:flex; justify-content:space-between; align-items:center; }
+
+/* ── WARNING ── */
+.warning {
+  background:var(--warn-bg); border:1px solid #e8c9ba;
+  border-left:2px solid var(--accent);
+  border-radius:4px; padding:10px 16px;
+  font-size:.7rem; color:var(--accent);
+  margin-bottom:16px; display:none;
+}
+.warning.show { display:block; }
+
+/* ── CATEGORY ROWS ── */
+.cat-section { margin-bottom:4px; }
+
+.cat-row {
+  display:grid;
+  grid-template-columns: 130px 1fr 90px 80px;
+  align-items:center; gap:10px;
+  padding:9px 0;
+  border-bottom:1px solid var(--line);
+}
+.cat-row:last-child { border-bottom:none; }
+.cat-name { font-size:.78rem; color:var(--text); }
+.cat-sub  { font-size:.62rem; color:var(--faint); margin-top:1px; }
+
+.bar-track {
+  height:4px; background:var(--line);
+  border-radius:2px; overflow:visible; position:relative;
+}
+.bar-fill {
+  height:100%; border-radius:2px;
+  background:var(--text); opacity:.35;
+  transition:width .4s cubic-bezier(.25,1,.5,1);
+  position:relative;
+}
+.bar-fill.over { background:var(--accent); opacity:.8; }
+.bar-budget-marker {
+  position:absolute; top:-3px; width:1px; height:10px;
+  background:var(--line2); right:0;
+}
+
+.cat-spent  { font-size:.72rem; text-align:right; color:var(--mid); }
+.cat-budget { font-size:.72rem; text-align:right; color:var(--faint); }
+.cat-spent.over { color:var(--accent); font-weight:500; }
+
+/* ── TRADE-OFF NUDGE ── */
+.tradeoff {
+  font-size:.65rem; color:var(--accent);
+  padding:6px 0; display:none;
+  border-bottom:1px solid var(--line);
+}
+.tradeoff.show { display:block; }
+
+/* ── INPUTS ── */
+input, select {
+  font-family:'Geist Mono',monospace; font-size:.75rem;
+  background:var(--surface); border:1px solid var(--line);
+  color:var(--text); padding:8px 10px; border-radius:3px;
+  outline:none; transition:border-color .15s; width:100%;
+}
+input:focus, select:focus { border-color:var(--line2); }
+input::placeholder { color:var(--faint); }
+input[type=number] { -moz-appearance:textfield; }
+input[type=number]::-webkit-inner-spin-button { display:none; }
+
+/* ── BUTTONS ── */
+button.primary {
+  font-family:'Geist Mono',monospace; font-size:.7rem; font-weight:500;
+  background:var(--text); color:var(--bg);
+  border:none; padding:8px 16px; border-radius:3px;
+  cursor:pointer; white-space:nowrap;
+  transition:opacity .15s;
+}
+button.primary:hover { opacity:.8; }
+button.ghost {
+  font-family:'Geist Mono',monospace; font-size:.7rem;
+  background:none; border:1px solid var(--line); color:var(--mid);
+  padding:8px 14px; border-radius:3px; cursor:pointer;
+  transition:border-color .15s, color .15s;
+}
+button.ghost:hover { border-color:var(--line2); color:var(--text); }
+button.del {
+  background:none; border:none; color:var(--faint);
+  font-size:.7rem; padding:2px 6px; cursor:pointer; border-radius:2px;
+  font-family:'Geist Mono',monospace;
+  transition:color .1s;
+}
+button.del:hover { color:var(--accent); }
+button.link {
+  background:none; border:none; font-family:'Geist Mono',monospace;
+  font-size:.65rem; color:var(--faint); cursor:pointer; padding:0;
+  text-decoration:underline; text-underline-offset:2px;
+}
+button.link:hover { color:var(--mid); }
+
+/* ── ADD EXPENSE FORM ── */
+.add-form {
+  background:var(--surface); border:1px solid var(--line);
+  border-radius:4px; padding:16px 18px; margin-bottom:20px;
+}
+.add-form-grid {
+  display:grid; grid-template-columns:1fr 140px 100px auto; gap:8px;
+  align-items:end;
+}
+.field-label { font-size:.58rem; color:var(--faint); margin-bottom:4px; letter-spacing:.08em; text-transform:uppercase; }
+
+/* ── EXPENSE LIST ── */
+.expense-item {
+  display:grid; grid-template-columns:1fr 110px 80px 24px;
+  align-items:center; gap:10px;
+  padding:8px 0; border-bottom:1px solid var(--line);
+  animation:fadein .15s ease;
+}
+@keyframes fadein { from{opacity:0;transform:translateY(-3px)} to{opacity:1;transform:translateY(0)} }
+.expense-item:last-child { border-bottom:none; }
+.exp-name  { font-size:.78rem; color:var(--text); }
+.exp-cat   { font-size:.62rem; color:var(--faint); }
+.exp-date  { font-size:.65rem; color:var(--faint); text-align:right; }
+.exp-amt   { font-size:.78rem; text-align:right; color:var(--mid); }
+
+/* ── PLAN TAB ── */
+.plan-cat-row {
+  display:grid; grid-template-columns:1fr 110px 110px;
+  gap:10px; align-items:center;
+  padding:8px 0; border-bottom:1px solid var(--line);
+}
+.plan-cat-row:last-child { border-bottom:none; }
+.sinking-hint { font-size:.6rem; color:var(--ok); margin-top:2px; }
+
+/* ── MONTH NAV ── */
+.month-nav { display:flex; align-items:center; gap:10px; }
+.month-nav button {
+  background:none; border:none; cursor:pointer;
+  color:var(--faint); font-size:.9rem; padding:2px 6px;
+  transition:color .15s;
+}
+.month-nav button:hover { color:var(--text); }
+.month-label { font-size:.78rem; color:var(--text); min-width:90px; text-align:center; }
+
+/* ── MODAL ── */
+.modal-backdrop {
+  position:fixed; inset:0; background:rgba(26,24,20,.4);
+  display:none; align-items:center; justify-content:center; z-index:100;
+}
+.modal-backdrop.show { display:flex; }
+.modal {
+  background:var(--surface); border:1px solid var(--line);
+  border-radius:6px; padding:24px; width:360px; max-width:90vw;
+}
+.modal h2 { font-family:'EB Garamond',serif; font-weight:400; font-size:1.1rem; margin-bottom:4px; }
+.modal p  { font-size:.7rem; color:var(--mid); margin-bottom:16px; line-height:1.5; }
+.modal-fields { display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
+.modal-row { display:flex; gap:8px; }
+
+/* ── EMPTY ── */
+.empty { text-align:center; padding:40px 0; color:var(--faint); font-size:.72rem; line-height:2; }
+
+/* ── HISTORY ── */
+.history-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:8px 0; border-bottom:1px solid var(--line); font-size:.72rem;
+}
+.history-row:last-child { border-bottom:none; }
+.history-month { color:var(--mid); }
+.history-nums { display:flex; gap:16px; color:var(--faint); }
+.history-nums span { color:var(--text); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="row-between" style="margin-bottom:24px">
+  <div>
+    <h1>Budget</h1>
+    <div class="label" style="margin-top:3px">Monthly planner</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+  <button class="ghost" id="signOutBtn" onclick="signOut()" style="font-size:.65rem;padding:6px 12px;display:none">Sign out</button>
+  <div class="month-nav">
+    <button onclick="shiftMonth(-1)">‹</button>
+    <div class="month-label" id="monthLabel">—</div>
+    <button onclick="shiftMonth(1)">›</button>
+  </div>
+  </div>
+</div>
+
+<!-- DESCRIPTION -->
+<div style="margin-bottom:24px; padding-bottom:24px; border-bottom:1px solid var(--line)">
+  <ol style="font-size:.78rem; color:var(--mid); line-height:2; max-width:560px; padding-left:1.1em">
+    <li>Set a <strong style="color:var(--text); font-weight:500">savings goal</strong> above — this is what you're budgeting toward.</li>
+    <li>Go to <strong style="color:var(--text); font-weight:500">Plan</strong> → enter your monthly income, then set a dollar amount for each spending category. For annual costs like insurance, enter the yearly amount in the right column and it will divide it into a monthly figure automatically.</li>
+    <li>Go to <strong style="color:var(--text); font-weight:500">Track</strong> → log each expense with a description, category, and amount. Hit Add or press Enter. To delete a wrong entry, click Show under Expenses, then hit ✕ next to it.</li>
+    <li>The bars show how much of each category's budget you've used. Red means over. The burn rate line tells you if you're spending faster than the month allows.</li>
+    <li><strong style="color:var(--text); font-weight:500">History</strong> shows every past month's totals so you can spot patterns over time.</li>
+  </ol>
+</div>
+
+<!-- GOAL BANNER -->
+<div class="goal-bar empty" id="goalBanner" onclick="openGoalModal()"></div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('track')">Track</button>
+  <button class="tab" onclick="switchTab('plan')">Plan</button>
+  <button class="tab" onclick="switchTab('history')">History</button>
+</div>
+
+<!-- ═══ TRACK TAB ═══ -->
+<div id="tab-track">
+
+  <!-- Summary -->
+  <div class="summary" id="summary">
+    <div class="stat">
+      <div class="label">Allocated</div>
+      <div class="stat-val" id="s-allocated">$0</div>
+    </div>
+    <div class="stat">
+      <div class="label">Spent</div>
+      <div class="stat-val" id="s-spent">$0</div>
+    </div>
+    <div class="stat">
+      <div class="label">Left</div>
+      <div class="stat-val ok" id="s-left">$0</div>
+    </div>
+  </div>
+
+  <!-- Burn rate -->
+  <div class="burn" id="burnStrip"></div>
+
+  <!-- Warning -->
+  <div class="warning" id="warnStrip"></div>
+
+  <!-- Add expense -->
+  <div class="add-form">
+    <div class="add-form-grid">
+      <div>
+        <div class="field-label">Description</div>
+        <input id="e-name" placeholder="e.g. Trader Joe's" type="text" onkeydown="if(event.key==='Enter')addExpense()"/>
+      </div>
+      <div>
+        <div class="field-label">Category</div>
+        <select id="e-cat"></select>
+      </div>
+      <div>
+        <div class="field-label">Amount</div>
+        <input id="e-amt" placeholder="0.00" type="number" min="0" step="0.01" onkeydown="if(event.key==='Enter')addExpense()"/>
+      </div>
+      <div style="padding-top:18px">
+        <button class="primary" onclick="addExpense()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category breakdown -->
+  <div id="catBreakdown"></div>
+
+  <!-- Expense list toggle -->
+  <div style="margin-top:20px">
+    <div class="row-between" style="margin-bottom:10px">
+      <div class="label">Expenses</div>
+      <button class="link" onclick="toggleExpenses()" id="expToggle">show</button>
+    </div>
+    <div id="expenseList" style="display:none"></div>
+  </div>
+
+</div>
+
+<!-- ═══ PLAN TAB ═══ -->
+<div id="tab-plan" style="display:none">
+  <div style="margin-bottom:16px">
+    <div class="label" style="margin-bottom:6px">Income this month</div>
+    <div class="row" style="gap:8px; max-width:260px">
+      <input id="p-income" type="number" placeholder="Monthly take-home" step="100"
+        onchange="setIncome(this.value)"/>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <div class="row-between" style="margin-bottom:10px">
+    <div class="label">Category allocations</div>
+    <button class="link" onclick="openCatModal()">+ add category</button>
+  </div>
+
+  <!-- plan header -->
+  <div style="display:grid;grid-template-columns:1fr 110px 110px;gap:10px;padding:0 0 6px;border-bottom:1px solid var(--line2)">
+    <div class="label">Category</div>
+    <div class="label" style="text-align:right">Monthly budget</div>
+    <div class="label" style="text-align:right">Annual / sinking</div>
+  </div>
+  <div id="planRows"></div>
+
+  <hr class="divider"/>
+
+  <div class="row-between" style="font-size:.72rem; color:var(--mid); margin-bottom:4px">
+    <span>Total allocated</span>
+    <span id="p-totalAlloc">$0</span>
+  </div>
+  <div class="row-between" style="font-size:.72rem; color:var(--mid); margin-bottom:4px">
+    <span>Income</span>
+    <span id="p-income-disp">$0</span>
+  </div>
+  <div class="row-between" style="font-size:.78rem; font-weight:500" id="p-unalloc-row">
+    <span>Unallocated</span>
+    <span id="p-unalloc">$0</span>
+  </div>
+
+</div>
+
+<!-- ═══ HISTORY TAB ═══ -->
+<div id="tab-history" style="display:none">
+  <div class="label" style="margin-bottom:12px">Month-over-month</div>
+  <div id="historyList"><div class="empty">No history yet.<br/>Complete a month to see trends.</div></div>
+</div>
+
+<!-- ══ GOAL MODAL ══ -->
+<div class="modal-backdrop" id="goalModal">
+  <div class="modal">
+    <h2>Savings goal</h2>
+    <p>Name what you're saving for. This is your budget's north star.</p>
+    <div class="modal-fields">
+      <div>
+        <div class="field-label">Goal name</div>
+        <input id="g-name" placeholder="e.g. Japan trip, emergency fund"/>
+      </div>
+      <div class="modal-row">
+        <div style="flex:1">
+          <div class="field-label">Target amount</div>
+          <input id="g-target" type="number" placeholder="5000"/>
+        </div>
+        <div style="flex:1">
+          <div class="field-label">Saved so far</div>
+          <input id="g-saved" type="number" placeholder="0"/>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="gap:8px; justify-content:flex-end">
+      <button class="ghost" onclick="deleteGoal()" style="color:var(--accent);border-color:var(--accent);margin-right:auto">Delete</button>
+      <button class="ghost" onclick="deleteGoal()" style="color:var(--accent);border-color:var(--accent);margin-right:auto">Delete</button>
+      <button class="ghost" onclick="closeModal('goalModal')">Cancel</button>
+      <button class="primary" onclick="saveGoal()">Save goal</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CATEGORY MODAL ══ -->
+<div class="modal-backdrop" id="catModal">
+  <div class="modal">
+    <h2>Add category</h2>
+    <p>Use specific names — "Restaurants" beats "Food".</p>
+    <div class="modal-fields">
+      <div>
+        <div class="field-label">Category name</div>
+        <input id="c-name" placeholder="e.g. Groceries, Rent, Coffee"/>
+      </div>
+    </div>
+    <div class="row" style="gap:8px; justify-content:flex-end">
+      <button class="ghost" onclick="closeModal('catModal')">Cancel</button>
+      <button class="primary" onclick="addCategory()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TRADE-OFF MODAL ══ -->
+<div class="modal-backdrop" id="tradeoffModal">
+  <div class="modal">
+    <h2>Roll with the punches</h2>
+    <p id="tradeoffMsg">You overspent. Move money from another category to cover it.</p>
+    <div style="margin-bottom:16px" id="tradeoffOptions"></div>
+    <div class="row" style="gap:8px; justify-content:flex-end">
+      <button class="ghost" onclick="closeModal('tradeoffModal')">Skip for now</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────
+const MONTHS = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+
+const DEFAULT_CATS = [
+  'Rent / Housing','Groceries','Restaurants','Coffee & Drinks',
+  'Transport','Health','Entertainment','Shopping','Utilities','Savings'
+];
+
+// ── PASTE YOUR SUPABASE VALUES HERE ──────────────────────────────
+const SUPABASE_URL  = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';
+// ─────────────────────────────────────────────────────────────────
+
+// Detect whether credentials have been filled in
+const SUPABASE_READY = SUPABASE_URL !== 'YOUR_SUPABASE_URL';
+const sb = SUPABASE_READY
+  ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON)
+  : null;
+
+let state = freshState();
+let currentMonth = todayKey();
+let activeTab = 'track';
+let showExpenses = false;
+let currentUser = null;
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function freshState() {
+  return {
+    goal: null,
+    categories: [...DEFAULT_CATS],
+    months: {}
+  };
+}
+
+// save: Supabase if configured, localStorage as fallback
+let saveTimer = null;
+function save() {
+  if (SUPABASE_READY && currentUser) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      await sb.from('budget_data').upsert({
+        user_id: currentUser.id,
+        data: state,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+    }, 800);
+  } else {
+    try { localStorage.setItem('budget_v3', JSON.stringify(state)); } catch {}
+  }
+}
+
+async function loadState() {
+  if (SUPABASE_READY && currentUser) {
+    const { data } = await sb.from('budget_data').select('data').eq('user_id', currentUser.id).single();
+    if (data && data.data) state = data.data;
+  } else {
+    try { state = JSON.parse(localStorage.getItem('budget_v3') || 'null') || freshState(); } catch {}
+  }
+}
+
+async function signOut() {
+  if (sb) await sb.auth.signOut();
+  window.location.href = '/auth';
+}
+
+function gm(key) {
+  key = key || currentMonth;
+  if (!state.months[key]) state.months[key] = {income:0, budgets:{}, expenses:[], sinking:{}};
+  return state.months[key];
+}
+
+function fmt(n, short) {
+  if (isNaN(n)) return '$0';
+  const abs = Math.abs(n);
+  if (short && abs >= 1000) return (n<0?'-':'')+'$'+(abs/1000).toFixed(1)+'k';
+  return (n<0?'-$':'$') + abs.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+}
+
+function daysInMonth(key) {
+  const [y,m] = key.split('-').map(Number);
+  return new Date(y,m,0).getDate();
+}
+
+function dayOfMonth() {
+  return new Date().getDate();
+}
+
+function monthLabel(key) {
+  const [y,m] = key.split('-').map(Number);
+  return MONTHS[m-1] + ' ' + y;
+}
+
+function shiftMonth(dir) {
+  const [y,m] = currentMonth.split('-').map(Number);
+  const d = new Date(y, m-1+dir, 1);
+  currentMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  render();
+}
+
+// ─── CATEGORIES ──────────────────────────────────────────────────────────
+function openCatModal() { document.getElementById('c-name').value=''; openModal('catModal'); }
+function addCategory() {
+  const n = document.getElementById('c-name').value.trim();
+  if (!n || state.categories.includes(n)) return;
+  state.categories.push(n);
+  save(); closeModal('catModal'); render();
+}
+
+// ─── GOAL ────────────────────────────────────────────────────────────────
+function openGoalModal() {
+  const g = state.goal||{};
+  document.getElementById('g-name').value   = g.name   || '';
+  document.getElementById('g-target').value = g.target || '';
+  document.getElementById('g-saved').value  = g.saved  || '';
+  openModal('goalModal');
+}
+function deleteGoal() { state.goal=null; save(); closeModal('goalModal'); render(); }
+function deleteGoal() { state.goal=null; save(); closeModal('goalModal'); render(); }
+function saveGoal() {
+  const name   = document.getElementById('g-name').value.trim();
+  const target = parseFloat(document.getElementById('g-target').value)||0;
+  const saved  = parseFloat(document.getElementById('g-saved').value)||0;
+  if (!name || !target) return;
+  state.goal = {name, target, saved};
+  save(); closeModal('goalModal'); render();
+}
+
+// ─── INCOME / BUDGET ─────────────────────────────────────────────────────
+function setIncome(v) { gm().income = parseFloat(v)||0; save(); render(); }
+function setBudget(cat, v) { gm().budgets[cat] = parseFloat(v)||0; save(); render(); }
+function setSinking(cat, v) {
+  const annual = parseFloat(v)||0;
+  gm().sinking[cat] = annual;
+  if (annual > 0) gm().budgets[cat] = parseFloat((annual/12).toFixed(2));
+  save(); render();
+}
+
+// ─── EXPENSES ────────────────────────────────────────────────────────────
+function addExpense() {
+  const name = document.getElementById('e-name').value.trim();
+  const cat  = document.getElementById('e-cat').value;
+  const amt  = parseFloat(document.getElementById('e-amt').value);
+  if (!name || !cat || isNaN(amt) || amt<=0) return;
+  const m = gm();
+  const today = new Date();
+  const date = `${today.getMonth()+1}/${today.getDate()}`;
+  m.expenses.push({id:Date.now(), name, cat, amt, date});
+  document.getElementById('e-name').value = '';
+  document.getElementById('e-amt').value  = '';
+  save();
+  // check tradeoff
+  const spent = spentBycat();
+  const over = state.categories.filter(c => m.budgets[c]>0 && spent[c]>(m.budgets[c]||0) && c===cat);
+  if (over.length) showTradeoff(cat, spent[cat] - (m.budgets[cat]||0));
+  else render();
+}
+
+function deleteExpense(id) {
+  const m = gm(); m.expenses = m.expenses.filter(e=>e.id!==id); save(); render();
+}
+
+function spentBycat(key) {
+  const m = gm(key);
+  const s = {};
+  state.categories.forEach(c=>s[c]=0);
+  m.expenses.forEach(e=>{if(s[e.cat]!==undefined)s[e.cat]+=e.amt;});
+  return s;
+}
+
+function totalSpent(key) { return Object.values(spentBycat(key)).reduce((a,b)=>a+b,0); }
+function totalBudgeted(key) { return Object.values(gm(key).budgets).reduce((a,b)=>a+b,0); }
+
+// ─── TRADE-OFF ────────────────────────────────────────────────────────────
+function showTradeoff(overCat, overAmt) {
+  const m = gm();
+  const spent = spentBycat();
+  const donors = state.categories.filter(c => c!==overCat && (m.budgets[c]||0) - (spent[c]||0) > 0);
+  const msg = `You're ${fmt(overAmt)} over in <strong>${overCat}</strong>. Pull from:`;
+  document.getElementById('tradeoffMsg').innerHTML = msg;
+  const opts = document.getElementById('tradeoffOptions');
+  if (!donors.length) { opts.innerHTML='<div style="font-size:.7rem;color:var(--faint)">No categories with remaining budget.</div>'; }
+  else {
+    opts.innerHTML = donors.map(c=>{
+      const avail = (m.budgets[c]||0)-(spent[c]||0);
+      return `<div class="row-between" style="padding:6px 0;border-bottom:1px solid var(--line);font-size:.72rem">
+        <span>${c}</span>
+        <span style="color:var(--mid)">${fmt(avail)} avail</span>
+        <button class="ghost" style="font-size:.65rem;padding:5px 10px" onclick="doTransfer('${overCat}','${c}',${overAmt})">Move ${fmt(Math.min(overAmt,avail))}</button>
+      </div>`;
+    }).join('');
+  }
+  openModal('tradeoffModal');
+  render();
+}
+
+function doTransfer(toCat, fromCat, amt) {
+  const m = gm();
+  const avail = (m.budgets[fromCat]||0) - spentBycat()[fromCat];
+  const move = Math.min(amt, avail);
+  m.budgets[toCat]   = (m.budgets[toCat]||0)   + move;
+  m.budgets[fromCat] = (m.budgets[fromCat]||0) - move;
+  save(); closeModal('tradeoffModal'); render();
+}
+
+// ─── MODAL ───────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+document.querySelectorAll('.modal-backdrop').forEach(b=>{
+  b.addEventListener('click',e=>{ if(e.target===b) b.classList.remove('show'); });
+});
+
+// ─── TABS ────────────────────────────────────────────────────────────────
+function switchTab(t) {
+  activeTab = t;
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('[id^=tab-]').forEach(el=>el.style.display='none');
+  document.querySelector(`.tab[onclick*="${t}"]`).classList.add('active');
+  document.getElementById('tab-'+t).style.display='block';
+  render();
+}
+
+function toggleExpenses() {
+  showExpenses = !showExpenses;
+  document.getElementById('expenseList').style.display = showExpenses?'block':'none';
+  document.getElementById('expToggle').textContent = showExpenses?'hide':'show';
+  renderExpenses();
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────
+function render() {
+  document.getElementById('monthLabel').textContent = monthLabel(currentMonth);
+  renderGoal();
+  renderCatSelect();
+  if (activeTab==='track')   renderTrack();
+  if (activeTab==='plan')    renderPlan();
+  if (activeTab==='history') renderHistory();
+}
+
+function renderGoal() {
+  const b = document.getElementById('goalBanner');
+  const g = state.goal;
+  if (!g) {
+    b.className='goal-bar empty';
+    b.onclick=openGoalModal;
+    b.innerHTML=`<div style="text-align:center"><div class="label">Savings goal</div><div style="font-size:.78rem;color:var(--faint);margin-top:3px">Set a goal — give your budget a reason</div></div>`;
+    return;
+  }
+  const pct = Math.min((g.saved/g.target)*100,100);
+  b.className='goal-bar';
+  b.onclick=null;
+  b.innerHTML=`
+    <div style="text-align:center">
+      <div class="label">Goal</div>
+      <div style="font-size:.82rem;margin-top:2px">${g.name}</div>
+      <div style="font-size:.72rem;color:var(--mid);margin-top:4px">${fmt(g.saved)} of ${fmt(g.target)}</div>
+      <button class="goal-edit" onclick="openGoalModal()" style="margin-top:2px">edit</button>
+    </div>
+    <div class="goal-progress-track" style="margin-top:12px"><div class="goal-progress-fill" style="width:${pct}%"></div></div>`;
+}
+
+function renderCatSelect() {
+  const sel = document.getElementById('e-cat');
+  const cur = sel.value;
+  sel.innerHTML = state.categories.map(c=>`<option value="${c}">${c}</option>`).join('');
+  if (cur && state.categories.includes(cur)) sel.value = cur;
+}
+
+function renderTrack() {
+  const m = gm();
+  const spent = spentBycat();
+  const totalS = Object.values(spent).reduce((a,b)=>a+b,0);
+  const totalB = Object.values(m.budgets).reduce((a,b)=>a+b,0);
+  const left   = totalB - totalS;
+
+  // Summary
+  document.getElementById('s-allocated').textContent = fmt(totalB,true);
+  document.getElementById('s-spent').textContent     = fmt(totalS,true);
+  const lEl = document.getElementById('s-left');
+  lEl.textContent = fmt(Math.abs(left),true);
+  lEl.className = 'stat-val ' + (left<0?'warn':(left<totalB*.1?'':'ok'));
+
+  // Burn rate
+  const burn = document.getElementById('burnStrip');
+  if (currentMonth===todayKey() && totalB>0) {
+    const days = daysInMonth(currentMonth);
+    const day  = dayOfMonth();
+    const ideal = (day/days)*totalB;
+    const pace  = totalS - ideal;
+    const projSpend = (totalS/day)*days;
+    if (Math.abs(pace)>1) {
+      burn.classList.add('show');
+      const ahead = pace>0;
+      burn.innerHTML = `<span>${ahead?'Spending ahead of pace':'Spending under pace'} — projected ${fmt(projSpend,true)} by end of month</span>
+        <span style="color:${ahead?'var(--accent)':'var(--ok)'}">${ahead?'↑':'↓'} ${fmt(Math.abs(pace),true)}</span>`;
+    } else { burn.classList.remove('show'); }
+  } else { burn.classList.remove('show'); }
+
+  // Warning
+  const warn = document.getElementById('warnStrip');
+  const overCats = state.categories.filter(c=>m.budgets[c]>0 && spent[c]>m.budgets[c]);
+  if (overCats.length) {
+    warn.classList.add('show');
+    warn.textContent = `Over budget: ${overCats.join(', ')}`;
+  } else { warn.classList.remove('show'); }
+
+  // Category breakdown
+  const activeCats = state.categories.filter(c=>m.budgets[c]>0||spent[c]>0);
+  const bd = document.getElementById('catBreakdown');
+  if (!activeCats.length) {
+    bd.innerHTML='<div class="empty">No budgets set.<br/>Go to Plan → set allocations first.</div>';
+    return;
+  }
+  bd.innerHTML = activeCats.map(c=>{
+    const s=spent[c]||0, b=m.budgets[c]||0;
+    const over=b>0&&s>b;
+    // Bar fill: s/b as % of budget, capped at 100%. Budget marker always at 100% (right edge).
+    // If no budget set, fill relative to spent only (show as full bar).
+    const fillPct = b>0 ? Math.min((s/b)*100, 100) : 100;
+    return `<div class="cat-row">
+      <div><div class="cat-name">${c}</div></div>
+      <div style="position:relative">
+        <div class="bar-track">
+          <div class="bar-fill${over?' over':''}" style="width:${fillPct}%"></div>
+          ${b>0?`<div style="position:absolute;right:0;top:-3px;width:1px;height:10px;background:var(--line2)"></div>`:''}
+        </div>
+      </div>
+      <div class="cat-spent${over?' over':''}">${fmt(s,true)}</div>
+      <div class="cat-budget">${b>0?fmt(b,true):'—'}</div>
+    </div>`;
+  }).join('');
+
+  if (showExpenses) renderExpenses();
+}
+
+function renderExpenses() {
+  const m = gm();
+  const el = document.getElementById('expenseList');
+  if (!m.expenses.length) { el.innerHTML='<div class="empty">No expenses yet.</div>'; return; }
+  el.innerHTML = [...m.expenses].reverse().map(e=>`
+    <div class="expense-item">
+      <div><div class="exp-name">${e.name}</div><div class="exp-cat">${e.cat}</div></div>
+      <div class="exp-date">${e.date||''}</div>
+      <div class="exp-amt">${fmt(e.amt)}</div>
+      <button class="del" onclick="deleteExpense(${e.id})">✕</button>
+    </div>`).join('');
+}
+
+function renderPlan() {
+  const m = gm();
+  document.getElementById('p-income').value = m.income||'';
+  document.getElementById('p-income-disp').textContent = fmt(m.income||0);
+
+  const rows = document.getElementById('planRows');
+  rows.innerHTML = state.categories.map(c=>{
+    const bval = m.budgets[c]||0;
+    const sval = m.sinking[c]||0;
+    return `<div class="plan-cat-row">
+      <div style="font-size:.78rem">${c}</div>
+      <div>
+        <input type="number" placeholder="—" value="${bval||''}" step="10"
+          style="text-align:right"
+          onchange="setBudget('${c}',this.value)"/>
+      </div>
+      <div>
+        <input type="number" placeholder="Annual cost" value="${sval||''}" step="100"
+          style="text-align:right"
+          onchange="setSinking('${c}',this.value)"/>
+        ${sval>0?`<div class="sinking-hint">→ ${fmt(sval/12)}/mo</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const totalAlloc = Object.values(m.budgets).reduce((a,b)=>a+b,0);
+  const unalloc = (m.income||0) - totalAlloc;
+  document.getElementById('p-totalAlloc').textContent = fmt(totalAlloc);
+  const ua = document.getElementById('p-unalloc');
+  ua.textContent = fmt(Math.abs(unalloc));
+  ua.style.color = unalloc<0 ? 'var(--accent)' : unalloc===0 ? 'var(--ok)' : 'var(--text)';
+}
+
+function renderHistory() {
+  const keys = Object.keys(state.months)
+    .filter(k=>state.months[k].expenses.length||Object.values(state.months[k].budgets).some(v=>v>0))
+    .sort().reverse();
+  const el = document.getElementById('historyList');
+  if (!keys.length) { el.innerHTML='<div class="empty">No history yet.<br/>Complete a month to see trends.</div>'; return; }
+  el.innerHTML = keys.map(k=>{
+    const ts=totalSpent(k), tb=totalBudgeted(k), diff=tb-ts;
+    return `<div class="history-row">
+      <span class="history-month">${monthLabel(k)}</span>
+      <div class="history-nums">
+        <span>spent <span>${fmt(ts,true)}</span></span>
+        <span>budget <span>${fmt(tb,true)}</span></span>
+        <span style="color:${diff<0?'var(--accent)':'var(--ok)'}">${diff<0?'−':'+'} ${fmt(Math.abs(diff),true)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────
+async function init() {
+  if (SUPABASE_READY) {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.href = '/auth'; return; }
+    currentUser = session.user;
+    document.getElementById('signOutBtn').style.display = 'block';
+  }
+  await loadState();
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
