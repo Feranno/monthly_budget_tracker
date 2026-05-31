@@ -47,6 +47,13 @@ button.primary:hover{opacity:.8}
     <div class="toggle">Back to <a onclick="showSignin()">Sign in</a></div>
   </div>
 
+  <div id="form-newpass" style="display:none">
+    <div class="sub" style="margin-bottom:20px">Choose a new password</div>
+    <div class="field"><div class="field-label">New password</div><input id="np-pass" type="password" placeholder="Min 6 characters"/></div>
+    <div class="field"><div class="field-label">Confirm password</div><input id="np-confirm" type="password" placeholder="Repeat password"/></div>
+    <button class="primary" onclick="updatePassword()">Set new password</button>
+  </div>
+
   <div id="form-signup" style="display:none">
     <div class="field"><div class="field-label">Email</div><input id="su-email" type="email" placeholder="you@example.com"/></div>
     <div class="field"><div class="field-label">Password</div><input id="su-pass" type="password" placeholder="Min 6 characters"/></div>
@@ -64,9 +71,18 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-// If already logged in, go straight to app
+// Listen for password recovery — must be set up before getSession
+sb.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    showNewPass();
+  }
+});
+
+// If already logged in (and not in recovery flow), go straight to app
 sb.auth.getSession().then(({ data: { session } }) => {
-  if (session) window.location.href = '/';
+  if (session && !window.location.hash.includes('type=recovery')) {
+    window.location.href = '/';
+  }
 });
 
 function showMsg(text, type) {
@@ -99,10 +115,29 @@ async function resetPassword() {
   const email = document.getElementById('r-email').value.trim();
   if (!email) return;
   const { error } = await sb.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + '/'
+    redirectTo: window.location.origin + '/auth'
   });
   if (error) { showMsg(error.message, 'error'); return; }
   showMsg('Check your email for a password reset link.', 'success');
+}
+
+function showNewPass() {
+  document.getElementById('form-signin').style.display = 'none';
+  document.getElementById('form-signup').style.display = 'none';
+  document.getElementById('form-reset').style.display = 'none';
+  document.getElementById('form-newpass').style.display = 'block';
+  document.getElementById('msg').className = 'msg';
+}
+
+async function updatePassword() {
+  const pass = document.getElementById('np-pass').value;
+  const confirm = document.getElementById('np-confirm').value;
+  if (!pass) return;
+  if (pass !== confirm) { showMsg('Passwords do not match.', 'error'); return; }
+  const { error } = await sb.auth.updateUser({ password: pass });
+  if (error) { showMsg(error.message, 'error'); return; }
+  showMsg('Password updated — signing you in.', 'success');
+  setTimeout(() => window.location.href = '/', 1200);
 }
 
 async function signIn() {
