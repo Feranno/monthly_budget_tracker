@@ -55,10 +55,30 @@ state = {
 
 Both files hardcode the same `SUPABASE_URL` and `SUPABASE_ANON` key. They are public anon keys (safe to commit), but if rotating them, update both files.
 
+### Key helpers (`index.html`)
+
+- **`gm(key?)`** — "get month". Returns (and lazily creates) the month object for `currentMonth` or the given key. All reads/writes to per-month data go through this.
+- **`fmt(n, short?)`** — formats a number as currency. `short=true` condenses values ≥ $1000 to `$1.2k`.
+- **`spentBycat(key?)`** — returns `{ [category]: totalSpent }` for the given month.
+
+### Sinking funds
+
+In the Plan tab, each category has an optional "Annual / sinking" input. When a value is entered, `setSinking()` automatically overwrites the monthly budget field with `annual / 12`. This is intentional — the two columns are linked and the annual column wins.
+
+### Trade-off modal
+
+When `addExpense()` pushes a category over budget, `showTradeoff()` fires instead of a plain `render()`. It opens a "Roll with the punches" modal listing other categories with remaining budget, letting the user move money between categories via `doTransfer()`. Closing without acting skips the rebalance but the overspend remains.
+
+### `auth.html` forms
+
+Four forms share the same card, only one visible at a time: `form-signin`, `form-signup`, `form-reset`, `form-newpass`. Visibility is toggled via `display:none/block` — no framework.
+
+The `PASSWORD_RECOVERY` flow requires `onAuthStateChange` to be registered **before** `getSession()` is called; the event fires synchronously on page load when following a reset link. The redirect guard checks `window.location.hash.includes('type=recovery')` to avoid auto-redirecting to `/` during a recovery session.
+
 ### Render cycle
 
 `render()` is the single entry point for all UI updates. It delegates to `renderGoal()`, `renderCatSelect()`, and one of `renderTrack()` / `renderPlan()` / `renderHistory()` depending on the active tab. There is no virtual DOM or reactive framework — DOM is rebuilt via `innerHTML` on every render call.
 
-### Known issue
+### Design system
 
-`deleteGoal` is defined twice in `index.html` (lines 613–614). The second definition silently overrides the first; both are identical so it's harmless, but the duplicate should be removed if editing that area.
+CSS custom properties (defined in `:root` in `index.html`) are the only theming mechanism. Key tokens: `--bg` (warm off-white), `--surface` (white), `--accent` (terracotta — used only for warnings/over-budget), `--ok` (green). Two fonts: `EB Garamond` (serif, used for headings and large numbers) and `Geist Mono` (monospace, everything else).

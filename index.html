@@ -611,7 +611,6 @@ function openGoalModal() {
   openModal('goalModal');
 }
 function deleteGoal() { state.goal=null; save(); closeModal('goalModal'); render(); }
-function deleteGoal() { state.goal=null; save(); closeModal('goalModal'); render(); }
 function saveGoal() {
   const name   = document.getElementById('g-name').value.trim();
   const target = parseFloat(document.getElementById('g-target').value)||0;
