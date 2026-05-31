@@ -37,7 +37,14 @@ button.primary:hover{opacity:.8}
     <div class="field"><div class="field-label">Email</div><input id="si-email" type="email" placeholder="you@example.com"/></div>
     <div class="field"><div class="field-label">Password</div><input id="si-pass" type="password" placeholder="••••••••"/></div>
     <button class="primary" onclick="signIn()">Sign in</button>
-    <div class="toggle">No account? <a onclick="showSignup()">Sign up</a></div>
+    <div class="toggle">Forgot password? <a onclick="showReset()">Reset it</a></div>
+    <div class="toggle" style="margin-top:8px">No account? <a onclick="showSignup()">Sign up</a></div>
+  </div>
+
+  <div id="form-reset" style="display:none">
+    <div class="field"><div class="field-label">Email</div><input id="r-email" type="email" placeholder="you@example.com"/></div>
+    <button class="primary" onclick="resetPassword()">Send reset email</button>
+    <div class="toggle">Back to <a onclick="showSignin()">Sign in</a></div>
   </div>
 
   <div id="form-signup" style="display:none">
@@ -76,8 +83,26 @@ function showSignup() {
 
 function showSignin() {
   document.getElementById('form-signup').style.display = 'none';
+  document.getElementById('form-reset').style.display = 'none';
   document.getElementById('form-signin').style.display = 'block';
   document.getElementById('msg').className = 'msg';
+}
+
+function showReset() {
+  document.getElementById('form-signin').style.display = 'none';
+  document.getElementById('form-signup').style.display = 'none';
+  document.getElementById('form-reset').style.display = 'block';
+  document.getElementById('msg').className = 'msg';
+}
+
+async function resetPassword() {
+  const email = document.getElementById('r-email').value.trim();
+  if (!email) return;
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/'
+  });
+  if (error) { showMsg(error.message, 'error'); return; }
+  showMsg('Check your email for a password reset link.', 'success');
 }
 
 async function signIn() {
