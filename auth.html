@@ -71,16 +71,20 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-// Listen for password recovery — must be set up before getSession
+// Must be registered before getSession so it fires first when the page
+// loads with a recovery hash — Supabase clears the hash before getSession
+// resolves, so we can't check window.location.hash in the getSession callback.
+let isRecovery = false;
 sb.auth.onAuthStateChange((event) => {
   if (event === 'PASSWORD_RECOVERY') {
+    isRecovery = true;
     showNewPass();
   }
 });
 
-// If already logged in (and not in recovery flow), go straight to app
+// If already logged in (and not in a recovery flow), go straight to app
 sb.auth.getSession().then(({ data: { session } }) => {
-  if (session && !window.location.hash.includes('type=recovery')) {
+  if (session && !isRecovery) {
     window.location.href = '/';
   }
 });
